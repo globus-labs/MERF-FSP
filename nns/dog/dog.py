@@ -156,16 +156,16 @@ class DifferenceOfGaussians(nn.Module):
         return blobs
 
 
-def torch_dog(dataloader, min_sigma=1, max_sigma=15, prune=False, overlap=0.5):
+def torch_dog(dataloader, min_sigma=1, max_sigma=30, prune=False, overlap=0.5):
     with torch.no_grad():
         dog = DifferenceOfGaussians(
             min_sigma=min_sigma,
             max_sigma=max_sigma,
-            sigma_bins=100,
-            footprint=np.array((15, 3, 3)),
+            sigma_bins=50,
+            footprint=np.array((3, 3, 3)),
             prune=prune,
             overlap=overlap,
-            threshold=0.002,
+            threshold=0.003,
         )
         for i, (gaussian_pyramid, sigmas, max_pool) in enumerate(dog.gaussian_pyramids):
             dog.gaussian_pyramids[i] = (
