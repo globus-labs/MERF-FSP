@@ -4,7 +4,7 @@ from pathlib import Path
 
 import numpy as np
 from scipy import stats, ndimage
-from skimage import exposure
+from skimage import exposure, img_as_float
 from skimage.filters import gaussian
 from skimage.io import imread
 
@@ -117,7 +117,15 @@ def test_multi():
         maj_img = major(img_org)
         make_figure(maj_img, dpi=300)
 
+def print_ranges():
+    for image_pth in glob.glob("/Users/maksim/dev_projects/merf/data/RawData/**/*.TIF"):
+        img_org = imread(image_pth)
+        img_org = img_as_float(img_org)
+        print(img_org.min(), img_org.max())
+
+
 
 if __name__ == "__main__":
-    test_multi()
+    # test_multi()
     # test_single()
+    print_ranges()

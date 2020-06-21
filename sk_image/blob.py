@@ -6,9 +6,11 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy
 import numpy as np
-from skimage import color, morphology
+from scipy.ndimage import gaussian_filter
+from skimage import color, morphology, img_as_float
 from skimage.draw import circle_perimeter
-from skimage.feature import canny, blob_dog, blob_log, blob_doh
+from skimage.feature import canny, blob_dog, blob_log, blob_doh, peak_local_max
+from skimage.feature.blob import _prune_blobs
 from skimage.filters import sobel, gaussian, threshold_otsu
 from skimage.io import imread
 from skimage.transform import hough_circle, hough_circle_peaks
@@ -16,7 +18,89 @@ from skimage.transform import hough_circle, hough_circle_peaks
 # from simulation.simulate import create_circular_mask
 
 # Load picture and detect edges
+from nn_dog.model import prune_blobs
 from sk_image.enhance_contrast import stretch_composite_histogram
+
+
+def cpu_blob_dog(
+    image,
+    min_sigma=1,
+    max_sigma=50,
+    sigma_bins=10,
+    threshold=2.0,
+    overlap=0.5,
+    prune=True,
+    *,
+    exclude_border=False
+):
+    image = img_as_float(image)
+
+    # if both min and max sigma are scalar, function returns only one sigma
+    scalar_sigma = np.isscalar(max_sigma) and np.isscalar(min_sigma)
+
+    # Gaussian filter requires that sequence-type sigmas have same
+    # dimensionality as image. This broadcasts scalar kernels
+    if np.isscalar(max_sigma):
+        max_sigma = np.full(image.ndim, max_sigma, dtype=float)
+    if np.isscalar(min_sigma):
+        min_sigma = np.full(image.ndim, min_sigma, dtype=float)
+
+    # Convert sequence types to array
+    min_sigma = np.asarray(min_sigma, dtype=float)
+    max_sigma = np.asarray(max_sigma, dtype=float)
+
+    # k such that min_sigma*(sigma_ratio**k) > max_sigma
+    # k = int(np.mean(np.log(max_sigma / min_sigma) / np.log(sigma_ratio) + 1))
+    # a geometric progression of standard deviations for gaussian kernels
+    # sigma_list = np.array([min_sigma * (sigma_ratio ** i) for i in range(k + 1)])
+
+    sigma_list = np.concatenate(
+        [
+            np.linspace(min_sigma, max_sigma, sigma_bins),
+            [max_sigma + (max_sigma - min_sigma) / (sigma_bins - 1)],
+        ]
+    )
+    gaussian_images = [gaussian_filter(image, s) for s in sigma_list]
+
+    # computing difference between two successive Gaussian blurred images
+    # multiplying with average standard deviation provides scale invariance
+    dog_images = [
+        (gaussian_images[i] - gaussian_images[i + 1]) * np.mean(sigma_list[i])
+        for i in range(sigma_bins)
+    ]
+
+    image_cube = np.stack(dog_images, axis=-1)
+
+    # local_maxima = get_local_maxima(image_cube, threshold)
+    local_maxima = peak_local_max(
+        image_cube,
+        threshold_abs=threshold,
+        footprint=np.ones((3,) * (image.ndim + 1)),
+        exclude_border=exclude_border,
+    )
+    # Catch no peaks
+    if local_maxima.size == 0:
+        return np.empty((0, 3))
+
+    # Convert local_maxima to float64
+    lm = local_maxima.astype(np.float64)
+
+    # translate final column of lm, which contains the index of the
+    # sigma that produced the maximum intensity value, into the sigma
+    sigmas_of_peaks = sigma_list[local_maxima[:, -1]]
+
+    if scalar_sigma:
+        # select one sigma column, keeping dimension
+        sigmas_of_peaks = sigmas_of_peaks[:, 0:1]
+
+    # Remove sigma index and replace with sigmas
+    lm = np.hstack([lm[:, :-1], sigmas_of_peaks])
+
+    sigma_dim = sigmas_of_peaks.shape[1]
+    if prune:
+        return prune_blobs(blobs_array=lm, overlap=overlap, sigma_dim=sigma_dim)
+    else:
+        return lm
 
 
 def circle(image):

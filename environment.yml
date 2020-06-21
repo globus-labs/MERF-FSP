@@ -8,6 +8,7 @@ dependencies:
   - pyvips
   - pyopengl
   - jupyter
+  - opt_einsum
   - pytorch 
   - torchvision 
   - cudatoolkit=10.1
@@ -15,4 +16,6 @@ dependencies:
   - pip:
       - black
       - jupyter_contrib_nbextensions
-      - glumpy  
+      - glumpy
+      - tikzplotlib
+      - pathos

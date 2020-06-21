@@ -1,11 +1,21 @@
+import csv
+import os
+import sys
+import time
+
 import numpy as np
+from PIL import Image
 from glumpy import app, gloo, gl
 from glumpy.ext import png
 from skimage.filters import gaussian
 from skimage.io import imread
 from skimage.util import random_noise
 
-from sk_image.preprocess import make_figure
+# noinspection PyUnresolvedReferences
+# from sk_image.blob import make_circles_fig
+
+# noinspection PyUnresolvedReferences
+# from sk_image.preprocess import make_figure
 
 
 def create_circular_mask(h, w, center=None, radius=None):
@@ -22,47 +32,27 @@ def create_circular_mask(h, w, center=None, radius=None):
 
 
 if __name__ == "__main__":
-    vertex = """
-        uniform vec2 resolution;
-        attribute vec3 center;
-        attribute float radius;
-        varying vec3 v_center;
-        varying float v_radius;
-        void main()
-        {
-            v_radius = radius;
-            v_center = center;
-            gl_PointSize = 2.0 + ceil(2.0*radius);
-            gl_Position = vec4(2.0*center.xy/resolution-1.0, v_center.z, 1.0);
-        } """
-
-    fragment = """
-      varying vec3 v_center;
-      varying float v_radius;
-      void main()
-      {
-          vec2 p = (gl_FragCoord.xy - v_center.xy)/v_radius;
-          float z = 1.0 - length(p);
-          if (z < 0.0) discard;
-
-          gl_FragDepth = 0.5*v_center.z + 0.5*(1.0 - z);
-
-          vec3 color = vec3(1.0, 1.0, 1.0);
-          vec3 normal = normalize(vec3(p.xy, z));
-          vec3 direction = normalize(vec3(0.0, 0.0, 1.0));
-          float diffuse = max(0.0, dot(direction, normal));
-          float specular = pow(diffuse, 24.0);
-          gl_FragColor = vec4(max(diffuse*color, specular*vec3(1.0)), 1.0);  
-       } 
-    """
-
+    print(sys.argv)
+    i = sys.argv[1]
     window_size = 1000
+    V = np.zeros(100, [("center", np.float32, 3), ("radius", np.float32, 1)])
+    cluster_mean = np.random.uniform(window_size // 4, 3 * window_size // 4, size=2)
+    cluster_std = np.diag(
+        np.random.uniform((window_size // 8) ** 2, (window_size // 4) ** 2, size=2)
+    )
+    V["center"][:, :2] = np.round(
+        np.random.multivariate_normal(mean=cluster_mean, cov=cluster_std, size=len(V))
+    )
+    # V["center"][:, 2] = np.random.uniform(0, 1, len(V))
+    V["radius"] = np.random.uniform(5, 30, len(V))
 
-    np.random.seed(1)
-    V = np.zeros(300, [("center", np.float32, 3), ("radius", np.float32, 1)])
-    V["center"] = np.random.uniform(0, window_size, (len(V), 3))
-    V["center"][:, 2] = np.random.uniform(0, 0, len(V))
-    V["radius"] = np.random.uniform(5, 20, len(V))
+    with open(f"test_data/truth{i}.csv", "w", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["x", "y", "z", "r"])
+        for ((x, y, z), r) in V:
+            if (0,0) <= (x,y) <= (window_size, window_size):
+                writer.writerow([x, y, z, r])
+
     app.use("glfw")
     window = app.Window(window_size, window_size)
 
@@ -71,9 +61,12 @@ if __name__ == "__main__":
         points["resolution"] = width, height
 
     @window.event
+    def on_init():
+        gl.glEnable(gl.GL_DEPTH_TEST)
+
+    @window.event
     def on_draw(dt):
         window.clear()
-        gl.glEnable(gl.GL_DEPTH_TEST)
         points.draw(gl.GL_POINTS)
         gl.glReadPixels(
             0,
@@ -84,24 +77,27 @@ if __name__ == "__main__":
             gl.GL_UNSIGNED_BYTE,
             framebuffer,
         )
-        png.from_array(framebuffer, "RGB").save("screenshot.png")
+        png.from_array(framebuffer, "RGB").save(f"test_data/screenshot{i}.png")
 
-    points = gloo.Program(vertex, fragment)
+    points = gloo.Program("vertex_shader.glsl", "fragment_shader.glsl")
     points.bind(V.view(gloo.VertexBuffer))
 
     framebuffer = np.zeros((window.height, 3 * window.width), dtype=np.uint8)
     app.run(framecount=1)
 
-    im = imread("screenshot.png", as_gray=True)
-    make_figure(im).show()
+    im = imread(f"test_data/screenshot{i}.png", as_gray=True)
+    # make_figure(im).show()
     background = np.zeros_like(im)
     noisy = random_noise(background, mode="gaussian")
     noisy = random_noise(noisy, mode="poisson")
 
+    blobs = []
     for (y, x, _z), r in V:
+        blobs.append((x, y, r))
         mask = create_circular_mask(window_size, window_size, (y, x), r * 0.9)
         noisy[mask] = 0
-
-    res = gaussian(noisy + im, sigma=1)
-    make_figure(res).show()
-    # make_figure(noisy+im).savefig("screenshot.png")
+    noise_strength = 2
+    res = gaussian(2 * noisy + im, sigma=1)
+    # make_circles_fig(res, np.array(blobs)).show()
+    Image.fromarray((res * 255).astype(np.uint8)).save(f"test_data/screenshot{i}.png")
+    time.sleep(1)
