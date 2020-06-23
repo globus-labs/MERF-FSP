@@ -13,8 +13,8 @@ from skimage.filters import gaussian
 import torch.multiprocessing as mp
 from nn_dog import PIN_MEMORY, DEVICE, NUM_GPUS
 from nn_dog.data import SimulPLIF
-from nn_dog.model import DifferenceOfGaussiansFFT, DifferenceOfGaussiansStandardConv, DifferenceOfGaussiansFFTParallel, \
-    close_pool
+from nn_dog.model import DifferenceOfGaussiansFFT, DifferenceOfGaussiansStandardConv, close_pool
+from nn_dog.model_parallel import DifferenceOfGaussiansFFTParallel
 from sk_image.blob import cpu_blob_dog
 from sk_image.enhance_contrast import stretch_composite_histogram
 
