@@ -10,7 +10,9 @@ import torch
 
 from sk_image.preprocess import make_figure, make_hist
 
-im = img_as_float(imread("/Users/maksim/dev_projects/merf/data/coins.jpg", as_gray=True))
+im = img_as_float(
+    imread("coins.jpg", as_gray=True)
+)
 # image_max is the dilation of im with a 20*20 structuring element
 # It is used within peak_local_max function
 min_distance = 20
@@ -22,10 +24,10 @@ m = nn.MaxPool2d(size, stride=1, padding=min_distance)
 t_im = torch.from_numpy(im).unsqueeze(0)
 # padded_t_im = nn.ConstantPad2d(min_distance, 0)(t_im)
 image_max_t = m(t_im).detach().numpy()[0]
-image_max = ndi.maximum_filter(im, size=size, mode='constant')
+image_max = ndi.maximum_filter(im, size=size, mode="constant")
 
-print((im-t_im[0].detach().numpy()).any())
-print(np.abs(image_max-image_max_t).any())
+print((im - t_im[0].detach().numpy()).any())
+print(np.abs(image_max - image_max_t).any())
 
 # get_peak_mask
 mask = im == image_max_t
@@ -45,35 +47,23 @@ coordinates = _get_high_intensity_peaks(im, mask, np.inf)
 # Comparison between image_max and im to find the coordinates of local maxima
 
 # display results
-fig, axes = plt.subplots(1, 5, figsize=(12, 3), sharex=True, sharey=True)
+fig, axes = plt.subplots(1, 3, figsize=(12, 3), sharex=True, sharey=True)
 ax = axes.ravel()
 ax[0].imshow(im, cmap=plt.cm.gray)
-ax[0].axis('off')
-ax[0].set_title('Original')
+ax[0].axis("off")
+ax[0].set_title("Original")
 
 ax[1].imshow(image_max, cmap=plt.cm.gray)
-ax[1].axis('off')
-ax[1].set_title('Maximum filter')
-
-ax[2].imshow(image_max_t, cmap=plt.cm.gray)
-ax[2].axis('off')
-ax[2].set_title('torch Maximum filter')
-
-ax[3].imshow(im, cmap=plt.cm.gray)
-ax[3].autoscale(False)
-ax[3].plot(coordinates[:, 1], coordinates[:, 0], 'r.')
-ax[3].axis('off')
-ax[3].set_title('torch Peak local max')
+ax[1].axis("off")
+ax[1].set_title("Max filter")
 
 coordinates = peak_local_max(im, min_distance=20)
-ax[4].imshow(im, cmap=plt.cm.gray)
-ax[4].autoscale(False)
-ax[4].plot(coordinates[:, 1], coordinates[:, 0], 'r.')
-ax[4].axis('off')
-ax[4].set_title('Peak local max')
+ax[2].imshow(im, cmap=plt.cm.gray)
+ax[2].autoscale(False)
+ax[2].plot(coordinates[:, 1], coordinates[:, 0], "r.")
+ax[2].axis("off")
+ax[2].set_title("Peak local max")
 
 fig.tight_layout()
 
 plt.show()
-
-

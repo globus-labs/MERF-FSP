@@ -8,7 +8,10 @@ from skimage.filters import gaussian
 from skimage.io import imread
 from skimage.util import random_noise
 
+# noinspection PyUnresolvedReferences
 from sk_image.blob import make_circles_fig
+
+# noinspection PyUnresolvedReferences
 from sk_image.preprocess import make_figure
 
 
@@ -27,7 +30,7 @@ def create_circular_mask(h, w, center=None, radius=None):
 
 if __name__ == "__main__":
     window_size = 1000
-    V = np.zeros(10, [("center", np.float32, 3), ("radius", np.float32, 1)])
+    V = np.zeros(100, [("center", np.float32, 3), ("radius", np.float32, 1)])
     cluster_mean = np.random.uniform(window_size // 4, 3 * window_size // 4, size=2)
     cluster_std = np.diag(
         np.random.uniform((window_size // 8) ** 2, (window_size // 4) ** 2, size=2)
@@ -42,7 +45,8 @@ if __name__ == "__main__":
         writer = csv.writer(csvfile)
         writer.writerow(["x", "y", "z", "r"])
         for ((x, y, z), r) in V:
-            writer.writerow([x, y, z, r])
+            if (0,0) <= (x,y) <= (window_size, window_size):
+                writer.writerow([x, y, z, r])
 
     app.use("glfw")
     window = app.Window(window_size, window_size)
@@ -84,9 +88,10 @@ if __name__ == "__main__":
 
     blobs = []
     for (y, x, _z), r in V:
-        blobs.append((x,y,r))
+        blobs.append((x, y, r))
         mask = create_circular_mask(window_size, window_size, (y, x), r * 0.9)
         noisy[mask] = 0
-    res = gaussian(noisy + im, sigma=1)
+    noise_strength = 2
+    res = gaussian(2 * noisy + im, sigma=1)
     # make_circles_fig(res, np.array(blobs)).show()
-    Image.fromarray((res*255).astype(np.uint8)).save("screenshot.png")
+    Image.fromarray((res * 255).astype(np.uint8)).save("screenshot.png")
